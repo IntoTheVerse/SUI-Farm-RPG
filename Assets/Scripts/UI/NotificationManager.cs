@@ -23,7 +23,7 @@ public class NotificationManager : MonoBehaviour
     { 
         notificationMessage.text = message;
         notification.SetActive(true);
-        await Task.Delay(3000);
+        await Task.Delay(5000);
         notification.SetActive(false);
     }
 }
