@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Collections;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
@@ -6,7 +7,8 @@ using UnityEngine.SceneManagement;
 using Firebase;
 using Firebase.Extensions;
 using Firebase.Storage;
-using System.Linq;
+using Firebase.Crashlytics;
+using UnityEngine.Networking;
 
 public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
 {
@@ -22,16 +24,22 @@ public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
 
         iSaveableObjectList = new List<ISaveable>();
 
-        storage = FirebaseStorage.DefaultInstance;
-        reference = storage.GetReferenceFromUrl("gs://suifarm-3badb.appspot.com");
-        LoadDataFromFile();
+        FirebaseApp.CheckAndFixDependenciesAsync().ContinueWith(task => {
+            var dependencyStatus = task.Result;
+            if (dependencyStatus == DependencyStatus.Available)
+            {
+                FirebaseApp app = FirebaseApp.DefaultInstance;
+                Crashlytics.ReportUncaughtExceptionsAsFatal = true;
+                storage = FirebaseStorage.DefaultInstance;
+                reference = storage.GetReferenceFromUrl("gs://suifarm-3badb.appspot.com");
+                LoadDataFromFile();
+            }
+            else
+            {
+                Debug.LogError(string.Format("Could not resolve all Firebase dependencies: {0}", dependencyStatus));
+            }
+        });
     }
-
-    // MemoryStream memStream = new();
-    // BinaryFormatter binForm = new();
-    // memStream.Write(request.ResponseData.Content, 0, request.ResponseData.Content.Length);
-    // memStream.Seek(0, SeekOrigin.Begin);
-    // GameSave obj = (GameSave)binForm.Deserialize(memStream);
 
     public void LoadDataFromFile()
     {
@@ -41,41 +49,45 @@ public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
         {
             if (!task.IsFaulted && !task.IsCanceled)
             {
-                Debug.Log(task.Result);
+                StartCoroutine(DownloadSaveData(task.Result.ToString()));
             }
             else
             {
-                Debug.Log(task.Exception);
+                Debug.Log(task.Exception.ToString());
             }
         });
+    }
 
-        // BinaryFormatter bf = new BinaryFormatter();
+    private IEnumerator DownloadSaveData(string url)
+    {
+        UnityWebRequest request = UnityWebRequest.Get(url);
+        yield return request.SendWebRequest();
 
-        // if (File.Exists(Application.persistentDataPath + "/WildHopeCreek.dat"))
-        // {
-        //     gameSave = new GameSave();
+        if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError || request.result == UnityWebRequest.Result.DataProcessingError)
+        {
+            Debug.Log(request.error);
+        }
+        else
+        {
+            MemoryStream memStream = new();
+            BinaryFormatter binForm = new();
+            memStream.Write(request.downloadHandler.data, 0, request.downloadHandler.data.Length);
+            memStream.Seek(0, SeekOrigin.Begin);
+            gameSave = (GameSave)binForm.Deserialize(memStream);
 
-        //     FileStream file = File.Open(Application.persistentDataPath + "/WildHopeCreek.dat", FileMode.Open);
-
-        //     gameSave = (GameSave)bf.Deserialize(file);
-
-        //     // loop through all ISaveable objects and apply save data
-        //     for (int i = iSaveableObjectList.Count - 1; i > -1; i--)
-        //     {
-        //         if (gameSave.gameObjectData.ContainsKey(iSaveableObjectList[i].ISaveableUniqueID))
-        //         {
-        //             iSaveableObjectList[i].ISaveableLoad(gameSave);
-        //         }
-        //         // else if iSaveableObject unique ID is not in the game object data then destroy object
-        //         else
-        //         {
-        //             Component component = (Component)iSaveableObjectList[i];
-        //             Destroy(component.gameObject);
-        //         }
-        //     }
-
-        //     file.Close();
-        // }
+            for (int i = iSaveableObjectList.Count - 1; i > -1; i--)
+            {
+                if (gameSave.gameObjectData.ContainsKey(iSaveableObjectList[i].ISaveableUniqueID))
+                {
+                    iSaveableObjectList[i].ISaveableLoad(gameSave);
+                }
+                else
+                {
+                    Component component = (Component)iSaveableObjectList[i];
+                    Destroy(component.gameObject);
+                }
+            }
+        }
 
         UIManager.Instance.DisablePauseMenu();
     }
@@ -84,26 +96,29 @@ public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
     {
         gameSave = new GameSave();
 
-        // loop through all ISaveable objects and generate save data
         foreach (ISaveable iSaveableObject in iSaveableObjectList)
         {
             gameSave.gameObjectData.Add(iSaveableObject.ISaveableUniqueID, iSaveableObject.ISaveableSave());
         }
 
-        BinaryFormatter bf = new BinaryFormatter();
+        BinaryFormatter binForm = new();
+        MemoryStream memStream = new();
+        binForm.Serialize(memStream, gameSave);
+        byte[] byteData = memStream.ToArray();
 
-        FileStream file = File.Open(Application.persistentDataPath + "/WildHopeCreek.dat", FileMode.Create);
+        StorageReference uploadRef = reference.Child("WalletManager.Instance.player.Wallets.First().Value.Address");
+        uploadRef.PutBytesAsync(byteData).ContinueWithOnMainThread((task) => {
+            if (task.IsFaulted || task.IsCanceled)
+                Debug.Log(task.Exception.ToString());
+            else 
+                Debug.Log("File Uploaded!");
 
-        bf.Serialize(file, gameSave);
-
-        file.Close();
-
-        UIManager.Instance.DisablePauseMenu();
+            UIManager.Instance.DisablePauseMenu();
+        });
     }
 
     public void StoreCurrentSceneData()
     {
-        // loop through all ISaveable objects and trigger store scene data for each
         foreach (ISaveable iSaveableObject in iSaveableObjectList)
         {
             iSaveableObject.ISaveableStoreScene(SceneManager.GetActiveScene().name);
@@ -112,7 +127,6 @@ public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
 
     public void RestoreCurrentSceneData()
     {
-        // loop through all ISaveable objects and trigger restore scene data for each
         foreach (ISaveable iSaveableObject in iSaveableObjectList)
         {
             iSaveableObject.ISaveableRestoreScene(SceneManager.GetActiveScene().name);

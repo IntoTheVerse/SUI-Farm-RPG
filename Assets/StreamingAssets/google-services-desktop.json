@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "209857904330",
+    "project_id": "suifarm-3badb",
+    "storage_bucket": "suifarm-3badb.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:209857904330:android:0d0c35b02d3d3ea9197e33",
+        "android_client_info": {
+          "package_name": "com.intotheverse.android.suifarm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGQ2ThF2pUZQahDTyng3LUzEQAiZhDnLg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
