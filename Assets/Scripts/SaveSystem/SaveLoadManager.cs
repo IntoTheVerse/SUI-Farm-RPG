@@ -1,15 +1,19 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Firebase;
+using Firebase.Extensions;
+using Firebase.Storage;
+using System.Linq;
 
 public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
 {
-
     public GameSave gameSave;
     public List<ISaveable> iSaveableObjectList;
+    private FirebaseStorage storage;
+    private StorageReference reference;
 
     protected override void Awake()
     {
@@ -17,6 +21,10 @@ public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
         base.Awake();
 
         iSaveableObjectList = new List<ISaveable>();
+
+        storage = FirebaseStorage.DefaultInstance;
+        reference = storage.GetReferenceFromUrl("gs://suifarm-3badb.appspot.com");
+        LoadDataFromFile();
     }
 
     // MemoryStream memStream = new();
@@ -27,33 +35,47 @@ public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
 
     public void LoadDataFromFile()
     {
-        BinaryFormatter bf = new BinaryFormatter();
+        StorageReference saveFile = reference.Child("WalletManager.Instance.player.Wallets.First().Value.Address");
 
-        if (File.Exists(Application.persistentDataPath + "/WildHopeCreek.dat"))
+        saveFile.GetDownloadUrlAsync().ContinueWithOnMainThread(task =>
         {
-            gameSave = new GameSave();
-
-            FileStream file = File.Open(Application.persistentDataPath + "/WildHopeCreek.dat", FileMode.Open);
-
-            gameSave = (GameSave)bf.Deserialize(file);
-
-            // loop through all ISaveable objects and apply save data
-            for (int i = iSaveableObjectList.Count - 1; i > -1; i--)
+            if (!task.IsFaulted && !task.IsCanceled)
             {
-                if (gameSave.gameObjectData.ContainsKey(iSaveableObjectList[i].ISaveableUniqueID))
-                {
-                    iSaveableObjectList[i].ISaveableLoad(gameSave);
-                }
-                // else if iSaveableObject unique ID is not in the game object data then destroy object
-                else
-                {
-                    Component component = (Component)iSaveableObjectList[i];
-                    Destroy(component.gameObject);
-                }
+                Debug.Log(task.Result);
             }
+            else
+            {
+                Debug.Log(task.Exception);
+            }
+        });
 
-            file.Close();
-        }
+        // BinaryFormatter bf = new BinaryFormatter();
+
+        // if (File.Exists(Application.persistentDataPath + "/WildHopeCreek.dat"))
+        // {
+        //     gameSave = new GameSave();
+
+        //     FileStream file = File.Open(Application.persistentDataPath + "/WildHopeCreek.dat", FileMode.Open);
+
+        //     gameSave = (GameSave)bf.Deserialize(file);
+
+        //     // loop through all ISaveable objects and apply save data
+        //     for (int i = iSaveableObjectList.Count - 1; i > -1; i--)
+        //     {
+        //         if (gameSave.gameObjectData.ContainsKey(iSaveableObjectList[i].ISaveableUniqueID))
+        //         {
+        //             iSaveableObjectList[i].ISaveableLoad(gameSave);
+        //         }
+        //         // else if iSaveableObject unique ID is not in the game object data then destroy object
+        //         else
+        //         {
+        //             Component component = (Component)iSaveableObjectList[i];
+        //             Destroy(component.gameObject);
+        //         }
+        //     }
+
+        //     file.Close();
+        // }
 
         UIManager.Instance.DisablePauseMenu();
     }
