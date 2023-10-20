@@ -9,6 +9,7 @@ using Firebase.Extensions;
 using Firebase.Storage;
 using Firebase.Crashlytics;
 using UnityEngine.Networking;
+using System.Linq;
 
 public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
 {
@@ -43,7 +44,7 @@ public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
 
     public void LoadDataFromFile()
     {
-        StorageReference saveFile = reference.Child("WalletManager.Instance.player.Wallets.First().Value.Address");
+        StorageReference saveFile = reference.Child(WalletManager.Instance.player.Wallets.First().Value.Address);
 
         saveFile.GetDownloadUrlAsync().ContinueWithOnMainThread(task =>
         {
@@ -106,7 +107,7 @@ public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
         binForm.Serialize(memStream, gameSave);
         byte[] byteData = memStream.ToArray();
 
-        StorageReference uploadRef = reference.Child("WalletManager.Instance.player.Wallets.First().Value.Address");
+        StorageReference uploadRef = reference.Child(WalletManager.Instance.player.Wallets.First().Value.Address);
         uploadRef.PutBytesAsync(byteData).ContinueWithOnMainThread((task) => {
             if (task.IsFaulted || task.IsCanceled)
                 Debug.Log(task.Exception.ToString());
