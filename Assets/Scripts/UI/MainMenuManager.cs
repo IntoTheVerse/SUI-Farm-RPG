@@ -100,12 +100,46 @@ public class MainMenuManager : MonoBehaviour
             {
                 WalletManager.Instance.user = JSON.Parse(JsonConvert.SerializeObject(((MoveObjectData)ownedObjectsResult.Result.Data[i].Data.Content).Fields));
 
+                //UpdatePlayerXP();
                 SetUpMainMenu();
                 return;
             }
         }
 
         CreateUserMetadata();
+    }
+
+    private async void UpdatePlayerXP()
+    {
+        Debug.Log(WalletManager.Instance.user["id"]["Id"].Value);
+        var signer = SuiWallet.GetActiveAddress();
+        var moveCallTx = new MoveCallTransaction()
+        {
+            Signer = signer,
+            PackageObjectId = "0x0e4eac7bdfb5400e7f3dca1166290479017cc64ab67a2a6fee54708b93a3a1e2",
+            Module = "game",
+            Function = "update_player_xp",
+            TypeArguments = ArgumentBuilder.BuildTypeArguments(),
+            Arguments = ArgumentBuilder.BuildArguments(WalletManager.Instance.user["id"]["Id"].Value, 10),
+            Gas = null,
+            GasBudget = 100000000,
+            RequestType = ExecuteTransactionRequestType.WaitForLocalExecution
+        };
+
+        var moveCallResult = await SuiApi.Client.MoveCallAsync(moveCallTx);
+
+        Debug.Log(moveCallResult.IsSuccess);
+        Debug.Log(moveCallResult.Result);
+        Debug.Log(moveCallResult.ErrorMessage);
+
+        var txBytes = moveCallResult.Result.TxBytes;
+        var rawSigner = new RawSigner(SuiWallet.GetActiveKeyPair());
+        var signature = rawSigner.SignData(Intent.GetMessageWithIntent(txBytes));
+
+        var txResponse = await SuiApi.Client.ExecuteTransactionBlockAsync(txBytes, new[] { signature.Value }, TransactionBlockResponseOptions.ShowAll(), ExecuteTransactionRequestType.WaitForLocalExecution);
+
+        Debug.Log(txResponse.ErrorMessage);
+        Debug.Log(JsonConvert.SerializeObject(txResponse.Result, Formatting.Indented));
     }
 
     private async void CreateUserMetadata()

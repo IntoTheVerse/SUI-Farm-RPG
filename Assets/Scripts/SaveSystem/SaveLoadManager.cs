@@ -95,6 +95,12 @@ public class SaveLoadManager : SingletonMonobehaviour<SaveLoadManager>
 
     public void SaveDataToFile()
     {
+        List<InventoryItem> items = FindObjectOfType<InventoryManager>().GetInventoryList();
+
+        foreach (var item in items)
+        {
+            
+        }
         gameSave = new GameSave();
 
         foreach (ISaveable iSaveableObject in iSaveableObjectList)

@@ -62,6 +62,21 @@ public class InventoryManager :SingletonMonobehaviour<InventoryManager>, ISaveab
         inventoryBar = FindObjectOfType<UIInventoryBar>();
     }
 
+    public List<InventoryItem> GetInventoryList()
+    {
+        List<InventoryItem> items = new();
+
+        for (int i = 0; i < inventoryLists.Length; i++)
+        {
+            for (int j = 0; j < inventoryLists[i].Count; j++)
+            {
+                items.Add(inventoryLists[i][j]);
+            }
+        }
+
+        return items;
+    }
+
     private void CreateInventoryLists()
     {
         inventoryLists = new List<InventoryItem>[(int)InventoryLocation.count];
