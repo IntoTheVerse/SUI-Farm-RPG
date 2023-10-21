@@ -1,6 +1,6 @@
 using System;
 using System.Linq;
-using System.Threading.Tasks;
+using SimpleJSON;
 using Newtonsoft.Json;
 using Suinet.Rpc;
 using Suinet.Rpc.Types;
@@ -84,42 +84,47 @@ public class MainMenuManager : MonoBehaviour
             await SuiAirdrop.RequestAirdrop(WalletManager.Instance.player.Wallets.First().Value.Address);
         }
 
-        //CreateUserMetadata();
-        //GetUserMetadata();
-
-        SetUpMainMenu();
+        GetUserMetadata();
     }
 
     private async void GetUserMetadata()
     {
         var address = SuiWallet.GetActiveAddress();
         var filter = ObjectDataFilterFactory.CreateMatchAllFilter(ObjectDataFilterFactory.CreateAddressOwnerFilter(address));
-        var ownedObjectsResult = await SuiApi.Client.GetOwnedObjectsAsync(address, new ObjectResponseQuery() { Filter = filter }, null, null);
+        var ownedObjectsResult = await SuiApi.Client.GetOwnedObjectsAsync(address, new ObjectResponseQuery() { Filter = filter, Options = ObjectDataOptions.ShowAll() }, null, null);
         Debug.Log(JsonConvert.SerializeObject(ownedObjectsResult.Result, Formatting.Indented));
+
+        for (int i = 0; i < ownedObjectsResult.Result.Data.Count; i++)
+        {
+            if (((MoveObjectData)ownedObjectsResult.Result.Data[i].Data.Content).Type == "0x0e4eac7bdfb5400e7f3dca1166290479017cc64ab67a2a6fee54708b93a3a1e2::game::Player")
+            {
+                WalletManager.Instance.user = JSON.Parse(JsonConvert.SerializeObject(((MoveObjectData)ownedObjectsResult.Result.Data[i].Data.Content).Fields));
+
+                SetUpMainMenu();
+                return;
+            }
+        }
+
+        CreateUserMetadata();
     }
 
     private async void CreateUserMetadata()
     {
-        
         var signer = SuiWallet.GetActiveAddress();
         var moveCallTx = new MoveCallTransaction()
         {
             Signer = signer,
-            PackageObjectId = "0x32e3428c370e7b3a478d57fb90cdd138b49856eb68928fa48b95d3dfde5aaebd",
+            PackageObjectId = "0x0e4eac7bdfb5400e7f3dca1166290479017cc64ab67a2a6fee54708b93a3a1e2",
             Module = "game",
             Function = "create_player",
             TypeArguments = ArgumentBuilder.BuildTypeArguments(),
-            Arguments = ArgumentBuilder.BuildArguments("{\"Xp\": 0}"),
+            Arguments = ArgumentBuilder.BuildArguments(0),
             Gas = null,
-            GasBudget = 10000000,
+            GasBudget = 100000000,
             RequestType = ExecuteTransactionRequestType.WaitForLocalExecution
         };
 
         var moveCallResult = await SuiApi.Client.MoveCallAsync(moveCallTx);
-
-        Debug.Log(moveCallResult.IsSuccess);
-        Debug.Log(moveCallResult.ErrorMessage);
-        Debug.Log(moveCallResult.RawRpcResponse);
 
         var txBytes = moveCallResult.Result.TxBytes;
         var rawSigner = new RawSigner(SuiWallet.GetActiveKeyPair());
@@ -127,46 +132,17 @@ public class MainMenuManager : MonoBehaviour
 
         var txResponse = await SuiApi.Client.ExecuteTransactionBlockAsync(txBytes, new[] { signature.Value }, TransactionBlockResponseOptions.ShowAll(), ExecuteTransactionRequestType.WaitForLocalExecution);
 
-        Debug.Log(txResponse.IsSuccess);
-        Debug.Log(txResponse.Result);
+        if (!txResponse.IsSuccess || txResponse.Result.Effects.Status.Status == ExecutionStatus.Failure)
+        {
+            NotificationManager.Instance.ShowNotification(txResponse.ErrorMessage);
+        }
+        else
+        {
+            SetUpMainMenu();
+        }
+        
         Debug.Log(txResponse.ErrorMessage);
-        Debug.Log(JsonConvert.SerializeObject(txResponse.Result, Formatting.Indented)); 
-
-
-
-
-
-
-        // var signer = SuiWallet.GetActiveAddress();
-        // var moveCallTx = new MoveCallTransaction()
-        // {
-        //     Signer = signer,
-        //     PackageObjectId = "0x32e3428c370e7b3a478d57fb90cdd138b49856eb68928fa48b95d3dfde5aaebd",
-        //     Module = "game",
-        //     Function = "get_player_metadata",
-        //     TypeArguments = ArgumentBuilder.BuildTypeArguments(),
-        //     Arguments = ArgumentBuilder.BuildArguments("0x2ef66440b4321345501392cef85d461f42a1cc126807840bc485af177f741ee6"),
-        //     Gas = null,
-        //     GasBudget = 10000000,
-        //     RequestType = ExecuteTransactionRequestType.WaitForLocalExecution
-        // };
-
-        // var moveCallResult = await SuiApi.Client.MoveCallAsync(moveCallTx);
-
-        // Debug.Log(moveCallResult.IsSuccess);
-        // Debug.Log(moveCallResult.ErrorMessage);
-        // Debug.Log(moveCallResult.RawRpcResponse);
-
-        // var txBytes = moveCallResult.Result.TxBytes;
-        // var rawSigner = new RawSigner(SuiWallet.GetActiveKeyPair());
-        // var signature = rawSigner.SignData(Intent.GetMessageWithIntent(txBytes));
-
-        // var txResponse = await SuiApi.Client.ExecuteTransactionBlockAsync(txBytes, new[] { signature.Value }, TransactionBlockResponseOptions.ShowAll(), ExecuteTransactionRequestType.WaitForLocalExecution);
-
-        // Debug.Log(txResponse.IsSuccess);
-        // Debug.Log(txResponse.Result);
-        // Debug.Log(txResponse.ErrorMessage);
-        // Debug.Log(JsonConvert.SerializeObject(txResponse.Result, Formatting.Indented)); 
+        Debug.Log(JsonConvert.SerializeObject(txResponse.Result, Formatting.Indented));
     }
 
     private async void SetUpMainMenu()

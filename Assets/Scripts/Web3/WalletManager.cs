@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using SimpleJSON;
 using UnityEngine;
 
 public class WalletManager : MonoBehaviour
@@ -9,6 +10,7 @@ public class WalletManager : MonoBehaviour
 
     [HideInInspector] public Suinet.SuiPlay.DTO.Player player = null;
     [HideInInspector] public BigInteger playerSuiBalance;
+    [HideInInspector] public JSONNode user;
 
     private void Awake()
     {
